@@ -5,10 +5,21 @@ import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { Chapter, getChapters, getProgress, pdfUrl, setProgress, summarizeChapter } from "../api";
 
+// cMaps fix CID-encoded text (Vietnamese/CJK garbage symbols) and standard
+// fonts cover PDFs that rely on non-embedded base fonts
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
   import.meta.url
 ).toString();
+
+const CMAP_URL = "https://unpkg.com/pdfjs-dist@4.6.82/cmaps/";
+const STD_FONTS_URL = "https://unpkg.com/pdfjs-dist@4.6.82/standard_fonts/";
+
+const OPTIONS = {
+  cMapUrl: CMAP_URL,
+  cMapPacked: true,
+  standardFontDataUrl: STD_FONTS_URL,
+};
 
 export default function ReaderPage() {
   const { id } = useParams();
@@ -23,13 +34,14 @@ export default function ReaderPage() {
   const paneRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSynced = useRef(0);
 
   useEffect(() => {
     getChapters(bookId).then(setChapters).catch(() => setError("Failed to load chapters"));
     getProgress(bookId).then((p) => p.last_page > 0 && setPage(p.last_page + 1)).catch(() => {});
   }, [bookId]);
 
-  // track current page while scrolling
+  // track current page while scrolling + sync progress (cross-device)
   useEffect(() => {
     const pane = paneRef.current;
     if (!pane) return;
@@ -40,7 +52,13 @@ export default function ReaderPage() {
       }
       setPage(current);
       if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(() => setProgress(bookId, current - 1), 800);
+      saveTimer.current = setTimeout(() => {
+        // only sync when position actually changed since last save
+        if (current - 1 !== lastSynced.current) {
+          lastSynced.current = current - 1;
+          setProgress(bookId, current - 1).catch(() => {});
+        }
+      }, 800);
     };
     pane.addEventListener("scroll", onScroll);
     return () => pane.removeEventListener("scroll", onScroll);
@@ -60,7 +78,6 @@ export default function ReaderPage() {
     setSummarizing((s) => new Set(s).add(ch.id));
     try {
       await summarizeChapter(bookId, ch.id);
-      // poll until summary arrives (background task)
       const poll = setInterval(async () => {
         const fresh = await getChapters(bookId);
         setChapters(fresh);
@@ -68,19 +85,15 @@ export default function ReaderPage() {
         if (now?.summarized) {
           clearInterval(poll);
           setSummarizing((s) => {
-            const n = new Set(s);
-            n.delete(ch.id);
-            return n;
+            const n = new Set(s); n.delete(ch.id); return n;
           });
         }
       }, 3000);
-      setTimeout(() => clearInterval(poll), 180000); // give up after 3 min
+      setTimeout(() => clearInterval(poll), 180000);
     } catch (err) {
       setError(String(err));
       setSummarizing((s) => {
-        const n = new Set(s);
-        n.delete(ch.id);
-        return n;
+        const n = new Set(s); n.delete(ch.id); return n;
       });
     }
   };
@@ -97,10 +110,8 @@ export default function ReaderPage() {
         )}
         {chapters.map((ch) => (
           <div key={ch.id}>
-            <div
-              className={`chapter-item ${active === ch.id ? "active" : ""}`}
-              onClick={() => openChapter(ch)}
-            >
+            <div className={`chapter-item ${active === ch.id ? "active" : ""}`}
+              onClick={() => openChapter(ch)}>
               <span className="ch-num">{ch.number ?? "•"}</span>
               {ch.title}
               {ch.summarized === 1 && <span className="sum-dot">✓</span>}
@@ -113,12 +124,8 @@ export default function ReaderPage() {
                     <div>{ch.summary}</div>
                   </>
                 ) : (
-                  <button
-                    className="btn"
-                    style={{ fontSize: 12, padding: "6px 12px" }}
-                    disabled={summarizing.has(ch.id)}
-                    onClick={() => doSummarize(ch)}
-                  >
+                  <button className="btn" style={{ fontSize: 12, padding: "6px 12px" }}
+                    disabled={summarizing.has(ch.id)} onClick={() => doSummarize(ch)}>
                     {summarizing.has(ch.id) ? "Summarizing…" : "✨ Summarize this chapter"}
                   </button>
                 )}
@@ -131,15 +138,14 @@ export default function ReaderPage() {
       <main className="pdf-pane" ref={paneRef}>
         <div className="toolbar">
           <button className="btn ghost" onClick={() => setScale((s) => Math.max(0.6, s - 0.2))}>−</button>
-          <input
-            type="range" min={0.6} max={2.5} step={0.1} value={scale}
-            onChange={(e) => setScale(Number(e.target.value))}
-          />
+          <input type="range" min={0.6} max={2.5} step={0.1} value={scale}
+            onChange={(e) => setScale(Number(e.target.value))} />
           <button className="btn ghost" onClick={() => setScale((s) => Math.min(2.5, s + 0.2))}>+</button>
           {error && <span className="error-msg">{error}</span>}
         </div>
         <Document
           file={pdfUrl(bookId)}
+          options={OPTIONS}
           onLoadSuccess={({ numPages: n }) => setNumPages(n)}
           onLoadError={(e) => setError(`PDF load failed: ${e.message}`)}
           loading={<div className="loading">Loading PDF…</div>}
