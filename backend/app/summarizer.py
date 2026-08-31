@@ -5,13 +5,10 @@ from .config import settings
 
 
 def _chat(messages: list[dict], max_tokens: int = 900) -> str:
+    # reasoning models (GLM etc.) spend tokens on hidden reasoning before the
+    # answer; keep reasoning enabled but budget generously so content is emitted
     payload = {"model": settings.llm_model, "messages": messages,
-               "max_tokens": max_tokens, "temperature": 0.3}
-    # glm-5.3-flash is a reasoning model: reasoning consumes the token budget,
-    # so raise max_tokens and (on OpenRouter) disable reasoning for this task
-    if "glm" in settings.llm_model or "deepseek-r" in settings.llm_model:
-        payload["reasoning"] = {"enabled": False}
-    payload["max_tokens"] = max_tokens
+               "max_tokens": max(max_tokens, 4000), "temperature": 0.3}
     r = httpx.post(
         f"{settings.llm_base_url}/chat/completions",
         headers={"Authorization": f"Bearer {settings.llm_api_key}"},
