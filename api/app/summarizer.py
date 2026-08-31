@@ -5,15 +5,29 @@ from .config import settings
 
 
 def _chat(messages: list[dict], max_tokens: int = 900) -> str:
+    payload = {"model": settings.llm_model, "messages": messages,
+               "max_tokens": max_tokens, "temperature": 0.3}
+    # glm-5.3-flash is a reasoning model: reasoning consumes the token budget,
+    # so raise max_tokens and (on OpenRouter) disable reasoning for this task
+    if "glm" in settings.llm_model or "deepseek-r" in settings.llm_model:
+        payload["reasoning"] = {"enabled": False}
+    payload["max_tokens"] = max_tokens
     r = httpx.post(
         f"{settings.llm_base_url}/chat/completions",
         headers={"Authorization": f"Bearer {settings.llm_api_key}"},
-        json={"model": settings.llm_model, "messages": messages,
-              "max_tokens": max_tokens, "temperature": 0.3},
+        json=payload,
         timeout=120,
     )
     r.raise_for_status()
-    return r.json()["choices"][0]["message"]["content"].strip()
+    data = r.json()
+    msg = data["choices"][0]["message"]
+    content = msg.get("content")
+    if not content:
+        # reasoning models may return content=None with reasoning field populated
+        content = msg.get("reasoning") or ""
+    if not content and data.get("choices", [{}])[0].get("finish_reason") == "length":
+        content = "(summary truncated)"
+    return content.strip()
 
 
 def _extract_pages(reader, start: int, end: int, max_chars: int) -> str:
