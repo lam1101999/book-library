@@ -85,8 +85,6 @@ export default function ReaderPage() {
     }
   };
 
-  const activeChapter = chapters.find((c) => c.id === active);
-
   return (
     <div className="reader">
       <aside className="sidebar">

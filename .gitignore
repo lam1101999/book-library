@@ -17,3 +17,7 @@ dist/
 .DS_Store
 .idea/
 .vscode/
+
+# serverless symlink is materialized at build time
+dev
+.vercel
