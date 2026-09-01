@@ -2,7 +2,7 @@
 import secrets
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -83,7 +83,7 @@ def list_books(user: User = Depends(current_user), db: Session = Depends(get_db)
 
 @router.post("/api/books", response_model=BookOut, status_code=201)
 async def upload_book(background: BackgroundTasks, file: UploadFile = File(...),
-                      title: str | None = None, author: str = "",
+                      title: str | None = Form(None), author: str = Form(""),
                       user: User = Depends(current_user),
                       db: Session = Depends(get_db)):
     ext = Path(file.filename or "").suffix.lower()
