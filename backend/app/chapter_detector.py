@@ -27,18 +27,22 @@ def _roman_to_int(s: str) -> int | None:
     return total
 
 
-def _walk_outline(items, depth=1, out=None):
+def _walk_outline(reader, items, depth=1, out=None):
     """Flatten pypdf outline (nested lists) into (level, title, page_idx)."""
     if out is None:
         out = []
     for it in items:
         if isinstance(it, list):
-            _walk_outline(it, depth + 1, out)
+            _walk_outline(reader, it, depth + 1, out)
         else:
+            page_idx = None
             try:
-                page_idx = it.page.get_index() if it.page is not None else None
-            except Exception:  # noqa: BLE001
-                page_idx = None
+                page_idx = it.page.get_index()
+            except Exception:  # noqa: BLE001  (pypdf 5: /Dest arrays need reader helper)
+                try:
+                    page_idx = reader.get_destination_page_number(it)
+                except Exception:  # noqa: BLE001
+                    page_idx = None
             out.append((depth, str(it.title), page_idx))
     return out
 
@@ -51,7 +55,7 @@ def detect_from_toc(reader: PdfReader) -> list[dict] | None:
         return None
     if not outline:
         return None
-    flat = _walk_outline(outline)
+    flat = _walk_outline(reader, outline)
     chapters = [
         {"title": t.strip()[:500], "start_page": p, "source": "toc"}
         for d, t, p in flat
@@ -95,16 +99,16 @@ def detect_from_text(reader: PdfReader, max_pages: int = 400) -> list[dict]:
 
 
 def build_chapters(reader: PdfReader) -> tuple[list[dict], str]:
-    """Returns (chapters_with_spans, method). Chapters get end_page filled in."""
+    """Returns (chapters_with_spans, method). Chapters get end_page filled in.
+
+    Outline policy: only embedded PDF bookmarks (/Outlines) are used. If the
+    PDF has none, return no chapters — the user creates them manually in the
+    reader (stored in DB with source='manual'), the PDF file is never modified.
+    """
     toc = detect_from_toc(reader)
-    if toc:
-        method = "toc"
-    else:
-        toc = detect_from_text(reader)
-        method = "regex"
+    method = "toc" if toc else "none"
     if not toc:
-        meta_title = (reader.metadata.title if reader.metadata else None) or "Full document"
-        toc = [{"title": meta_title[:500], "start_page": 0, "source": "fallback"}]
+        return [], method
     n_pages = len(reader.pages)
     for i, ch in enumerate(toc):
         ch["end_page"] = (toc[i + 1]["start_page"] - 1) if i + 1 < len(toc) else n_pages - 1

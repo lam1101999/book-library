@@ -1,6 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Book, Shelf, User, deleteBook, getAllProgress, listBooks, listShelves, logout, me, uploadBook } from "../api";
+import { Book, Shelf, User, coverUrl, deleteBook, getAllProgress, listBooks, listShelves, logout, me, uploadBook } from "../api";
+
+function CoverImage({ bookId, title }: { bookId: number; title: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+  return (
+    <img
+      src={coverUrl(bookId)}
+      alt={title}
+      className="book-cover"
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 export default function LibraryPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -90,6 +103,7 @@ export default function LibraryPage() {
           const p = progress[String(b.id)];
           return (
             <div key={b.id} className="book-card" onClick={() => nav(`/book/${b.id}`)}>
+              <CoverImage bookId={b.id} title={b.title} />
               <div className="title">{b.title}</div>
               <div className="meta">
                 {b.author || "Unknown author"}
