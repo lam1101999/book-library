@@ -22,6 +22,11 @@ services:
     environment:
       LIBRARY_DATABASE_URL: postgresql+psycopg://library:library@db:5432/library
       LIBRARY_STORAGE_DIR: /app/data/files
+      # Google OAuth (optional): set these in .env to enable Google login
+      LIBRARY_GOOGLE_CLIENT_ID: ${LIBRARY_GOOGLE_CLIENT_ID:-}
+      LIBRARY_GOOGLE_CLIENT_SECRET: ${LIBRARY_GOOGLE_CLIENT_SECRET:-}
+      # e.g. http://localhost:8080 — must match the redirect URI registered in Google Console
+      LIBRARY_OAUTH_REDIRECT_BASE: ${LIBRARY_OAUTH_REDIRECT_BASE:-}
     volumes:
       - uploads:/app/data/files
     depends_on:
