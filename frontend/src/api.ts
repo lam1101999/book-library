@@ -100,6 +100,29 @@ export async function getChapters(bookId: number): Promise<Chapter[]> {
   return r.json();
 }
 
+export async function createChapter(
+  bookId: number, body: { title: string; start_page: number; end_page?: number }
+): Promise<Chapter> {
+  const r = await req(`/books/${bookId}/chapters`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error((await r.json()).detail ?? "Create failed");
+  return r.json();
+}
+
+export async function deleteChapter(bookId: number, chapterId: number): Promise<void> {
+  const r = await req(`/books/${bookId}/chapters/${chapterId}`, { method: "DELETE" });
+  if (!r.ok && r.status !== 204) throw new Error("Delete failed");
+}
+
+export async function saveOutlineToPdf(bookId: number): Promise<string> {
+  const r = await req(`/books/${bookId}/outline/save-to-pdf`, { method: "POST" });
+  if (!r.ok) throw new Error((await r.json()).detail ?? "Save failed");
+  return (await r.json()).detail;
+}
+
 export async function summarizeChapter(bookId: number, chapterId: number): Promise<void> {
   const r = await req(`/books/${bookId}/chapters/${chapterId}/summarize`, { method: "POST" });
   if (!r.ok) throw new Error((await r.json()).detail ?? "Summarization failed to start");
@@ -107,6 +130,10 @@ export async function summarizeChapter(bookId: number, chapterId: number): Promi
 
 export function pdfUrl(bookId: number): string {
   return `${API}/books/${bookId}/file`;
+}
+
+export function coverUrl(bookId: number): string {
+  return `${API}/books/${bookId}/cover`;
 }
 
 // ---- shelves ----

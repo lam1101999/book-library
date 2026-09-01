@@ -135,6 +135,116 @@ def book_file(book_id: int, user: User = Depends(current_user),
     return FileResponse(path, media_type="application/pdf", filename=book.filename)
 
 
+@router.get("/api/books/{book_id}/cover")
+def book_cover(book_id: int, user: User = Depends(current_user),
+               db: Session = Depends(get_db)):
+    _get_own_book(db, user, book_id)
+    path = settings.storage_dir / f"cover_{book_id}.png"
+    if not path.exists():
+        raise HTTPException(404, "Cover not available")
+    return FileResponse(path, media_type="image/png")
+
+
+# ---- manual outline (DB-backed; PDF file only modified on explicit write-back) ----
+
+class ChapterCreate(BaseModel):
+    title: str
+    start_page: int
+    end_page: int | None = None
+
+
+@router.post("/api/books/{book_id}/chapters", response_model=ChapterOut, status_code=201)
+def create_chapter(book_id: int, body: ChapterCreate,
+                   user: User = Depends(current_user), db: Session = Depends(get_db)):
+    _get_own_book(db, user, book_id)
+    book = db.get(Book, book_id)
+    n_pages = book.num_pages or 0
+    if not (0 <= body.start_page < max(n_pages, body.start_page + 1)):
+        raise HTTPException(400, "start_page out of range")
+    ch = Chapter(
+        book_id=book_id, title=body.title.strip()[:500],
+        start_page=body.start_page,
+        end_page=body.end_page if body.end_page is not None else body.start_page,
+        source="manual",
+    )
+    db.add(ch)
+    db.commit()
+    db.refresh(ch)
+    return ch
+
+
+@router.delete("/api/books/{book_id}/chapters/{chapter_id}", status_code=204)
+def delete_chapter(book_id: int, chapter_id: int,
+                   user: User = Depends(current_user), db: Session = Depends(get_db)):
+    _get_own_book(db, user, book_id)
+    ch = db.get(Chapter, chapter_id)
+    if not ch or ch.book_id != book_id:
+        raise HTTPException(404, "Chapter not found")
+    db.delete(ch)
+    db.commit()
+
+
+@router.post("/api/books/{book_id}/outline/save-to-pdf")
+def save_outline_to_pdf(book_id: int, user: User = Depends(current_user),
+                        db: Session = Depends(get_db)):
+    """Write the current DB outline into the PDF's embedded bookmarks.
+
+    Writes to a temp file then atomically replaces the original; the old
+    outline tree is cleared first so no stale bookmarks remain.
+    """
+    _get_own_book(db, user, book_id)
+    book = db.get(Book, book_id)
+    chapters = db.scalars(select(Chapter).where(Chapter.book_id == book_id)
+                          .order_by(Chapter.start_page)).all()
+    src = settings.storage_dir / book.filename
+    if not src.exists():
+        raise HTTPException(404, "File missing")
+
+    import io
+    import os
+    import tempfile
+    from pypdf import PdfReader, PdfWriter
+    from pypdf.generic import (ArrayObject, DictionaryObject, NameObject,
+                               NumberObject, TextStringObject)
+
+    reader = PdfReader(str(src))
+    writer = PdfWriter()
+    writer.append(reader)  # clones pages
+    # replace the outline tree with a fresh one built from the DB
+    outlines = DictionaryObject()
+    outlines_ref = writer._add_object(outlines)
+    root = writer._root_object
+    root[NameObject("/Outlines")] = outlines_ref
+    outlines[NameObject("/Type")] = NameObject("/Outlines")
+    outlines[NameObject("/Count")] = NumberObject(len(chapters))
+    last_ref = None
+    for ch in chapters:
+        ref = writer._add_object(DictionaryObject())
+        item = writer.get_object(ref)
+        item[NameObject("/Title")] = TextStringObject(ch.title)
+        item[NameObject("/Parent")] = outlines_ref
+        item[NameObject("/Dest")] = ArrayObject(
+            [writer.pages[ch.start_page].indirect_reference, NameObject("/Fit")])
+        if last_ref is None:
+            outlines[NameObject("/First")] = ref
+        else:
+            writer.get_object(last_ref)[NameObject("/Next")] = ref
+            item[NameObject("/Prev")] = last_ref
+        outlines[NameObject("/Last")] = ref
+        if ch.source == "manual":
+            item[NameObject("/F")] = NumberObject(1)  # bold in viewers
+        last_ref = ref
+
+    buf = io.BytesIO()
+    writer.write(buf)
+    buf.seek(0)
+    fd, tmp_name = tempfile.mkstemp(suffix=".pdf", dir=str(settings.storage_dir))
+    with os.fdopen(fd, "wb") as f:
+        f.write(buf.read())
+    os.replace(tmp_name, src)
+    return {"detail": f"{len(chapters)} bookmarks written to PDF"}
+
+
 # ---- chapters ----
 @router.get("/api/books/{book_id}/chapters", response_model=list[ChapterOut])
 def list_chapters(book_id: int, user: User = Depends(current_user),

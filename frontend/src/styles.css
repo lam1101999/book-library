@@ -84,3 +84,13 @@ h1 a { color: var(--ink); text-decoration: none; }
   .reader { grid-template-columns: 1fr; }
   .sidebar { display: none; }
 }
+
+/* book cover thumbnail */
+.book-cover {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: var(--panel2);
+}

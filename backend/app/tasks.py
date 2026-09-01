@@ -12,7 +12,7 @@ log = logging.getLogger("library.tasks")
 
 
 def process_book(book_id: int) -> None:
-    """Detect chapters for a book; runs in a background thread with its own DB session."""
+    """Detect chapters (PDF outline only) + render cover; background thread."""
     db: Session = SessionLocal()
     try:
         book = db.get(Book, book_id)
@@ -26,7 +26,11 @@ def process_book(book_id: int) -> None:
 
         chapters, method = chapter_detector.build_chapters(reader)
         book.num_pages = len(reader.pages)
-        # replace any existing chapters
+        # render page-1 cover thumbnail (non-fatal if it fails)
+        from . import covers
+        covers.render_cover(path, settings.storage_dir / f"cover_{book.id}.png")
+        # replace any existing auto-detected chapters (manual ones would only
+        # exist after this first pass anyway)
         book.chapters.clear()
         db.flush()
         for i, ch in enumerate(chapters):
