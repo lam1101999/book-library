@@ -19,6 +19,12 @@ services:
 
   backend:
     build: ./backend
+    # read backend/.env too, so key/value pairs placed there (next to the code)
+    # reach the container without duplicating them in the repo-root .env.
+    # Precedence: shell env > repo-root .env > backend/.env > defaults below.
+    env_file:
+      - path: ./backend/.env
+        required: false
     environment:
       LIBRARY_DATABASE_URL: postgresql+psycopg://library:library@db:5432/library
       LIBRARY_STORAGE_DIR: /app/data/files
