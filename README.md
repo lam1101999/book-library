@@ -65,6 +65,18 @@ Backend tests (uses a throwaway schema; needs a reachable Postgres):
 cd backend && python -m pytest -v
 ```
 
+## E2E tests (Playwright — real browser against the running app)
+
+```bash
+cd frontend
+npm install
+npx playwright install chromium    # one-time browser download
+# start the app first (docker compose up -d, or the dev stack), then:
+BASE_URL=http://localhost:8080 npm run e2e
+```
+
+9 journeys: auth (register/login/errors), library (upload → cover renders → delete), reader (pages render, outline add/edit/delete, save-into-PDF). Set `BASE_URL` to wherever the app runs; tests create their own users.
+
 ## Configuration (env vars, prefix `LIBRARY_`)
 
 | Var | Default (compose) | Purpose |
