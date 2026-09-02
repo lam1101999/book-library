@@ -16,8 +16,8 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url
 ).toString();
 
-const CMAP_URL = "https://unpkg.com/pdfjs-dist@4.6.82/cmaps/";
-const STD_FONTS_URL = "https://unpkg.com/pdfjs-dist@4.6.82/standard_fonts/";
+const CMAP_URL = "https://unpkg.com/pdfjs-dist@4.4.168/cmaps/";
+const STD_FONTS_URL = "https://unpkg.com/pdfjs-dist@4.4.168/standard_fonts/";
 
 const editInputStyle: React.CSSProperties = {
   fontSize: 12, padding: "4px 6px", width: "100%", boxSizing: "border-box",

@@ -42,6 +42,22 @@ async function req(path: string, init?: RequestInit): Promise<Response> {
   return r;
 }
 
+// FastAPI error bodies: {"detail": "msg"} or {"detail": [{msg, ...}, ...]} (422)
+async function errorText(r: Response, fallback: string): Promise<string> {
+  try {
+    const body = await r.json();
+    const d = body.detail;
+    if (typeof d === "string") return d;
+    if (Array.isArray(d)) {
+      return d.map((e: { msg?: string }) => e.msg ?? JSON.stringify(e)).join("; ");
+    }
+    if (d) return String(d);
+    return JSON.stringify(body).slice(0, 200);
+  } catch {
+    return fallback;
+  }
+}
+
 // ---- auth ----
 export async function register(email: string, password: string, name: string) {
   const r = await fetch(`${API}/auth/register`, {
@@ -49,7 +65,7 @@ export async function register(email: string, password: string, name: string) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password, name }),
   });
-  if (!r.ok) throw new Error((await r.json()).detail ?? "Registration failed");
+  if (!r.ok) throw new Error(await errorText(r, "Registration failed"));
   return r.json();
 }
 
@@ -59,7 +75,7 @@ export async function login(email: string, password: string) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
   });
-  if (!r.ok) throw new Error((await r.json()).detail ?? "Login failed");
+  if (!r.ok) throw new Error(await errorText(r, "Login failed"));
   return r.json();
 }
 
@@ -86,7 +102,7 @@ export async function uploadBook(file: File, title?: string, author?: string): P
   if (title) form.append("title", title);
   form.append("author", author ?? "");
   const r = await req("/books", { method: "POST", body: form });
-  if (!r.ok) throw new Error((await r.json()).detail ?? "Upload failed");
+  if (!r.ok) throw new Error(await errorText(r, "Upload failed"));
   return r.json();
 }
 
@@ -108,7 +124,7 @@ export async function createChapter(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error((await r.json()).detail ?? "Create failed");
+  if (!r.ok) throw new Error(await errorText(r, "Create failed"));
   return r.json();
 }
 
@@ -119,13 +135,13 @@ export async function deleteChapter(bookId: number, chapterId: number): Promise<
 
 export async function saveOutlineToPdf(bookId: number): Promise<string> {
   const r = await req(`/books/${bookId}/outline/save-to-pdf`, { method: "POST" });
-  if (!r.ok) throw new Error((await r.json()).detail ?? "Save failed");
+  if (!r.ok) throw new Error(await errorText(r, "Save failed"));
   return (await r.json()).detail;
 }
 
 export async function summarizeChapter(bookId: number, chapterId: number): Promise<void> {
   const r = await req(`/books/${bookId}/chapters/${chapterId}/summarize`, { method: "POST" });
-  if (!r.ok) throw new Error((await r.json()).detail ?? "Summarization failed to start");
+  if (!r.ok) throw new Error(await errorText(r, "Summarization failed to start"));
 }
 
 export function pdfUrl(bookId: number): string {
