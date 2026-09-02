@@ -9,8 +9,9 @@ import {
   saveOutlineToPdf, setProgress, summarizeChapter,
 } from "../api";
 
-// cMaps fix CID-encoded text (Vietnamese/CJK garbage symbols) and standard
-// fonts cover PDFs that rely on non-embedded base fonts
+// Worker served from a stable, version-locked path (vite-plugin handles the
+// hashed asset; the ?url import keeps this immune to stale index.html caches
+// pointing at old hashes — the URL here always matches this JS bundle).
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
   import.meta.url
