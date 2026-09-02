@@ -27,6 +27,12 @@ services:
       LIBRARY_GOOGLE_CLIENT_SECRET: ${LIBRARY_GOOGLE_CLIENT_SECRET:-}
       # e.g. http://localhost:8080 — must match the redirect URI registered in Google Console
       LIBRARY_OAUTH_REDIRECT_BASE: ${LIBRARY_OAUTH_REDIRECT_BASE:-}
+      # LLM for summarization — set in the repo-root .env (compose reads it)
+      LIBRARY_LLM_BASE_URL: ${LIBRARY_LLM_BASE_URL:-https://openrouter.ai/api/v1}
+      LIBRARY_LLM_API_KEY: ${LIBRARY_LLM_API_KEY:-}
+      LIBRARY_LLM_MODEL: ${LIBRARY_LLM_MODEL:-z-ai/glm-5.3-flash}
+      # stable JWT secret so logins survive container restarts
+      LIBRARY_JWT_SECRET: ${LIBRARY_JWT_SECRET:-}
     volumes:
       - uploads:/app/data/files
     depends_on:
