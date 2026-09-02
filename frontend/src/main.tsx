@@ -4,7 +4,10 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import AuthPage from "./pages/AuthPage";
 import LibraryPage from "./pages/LibraryPage";
 import ReaderPage from "./pages/ReaderPage";
+import { installErrorReporting } from "./clientLogs";
 import "./styles.css";
+
+installErrorReporting();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

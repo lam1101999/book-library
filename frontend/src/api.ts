@@ -1,4 +1,4 @@
-const API = "/api";
+import { API } from "./config";
 
 export interface User {
   id: number;
