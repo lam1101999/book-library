@@ -3,6 +3,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+# build script also copies pdf.worker.min.mjs -> dist/pdf.worker.mjs (stable path)
 RUN npm run build
 
 FROM nginx:1.27-alpine

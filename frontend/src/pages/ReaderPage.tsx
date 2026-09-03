@@ -9,13 +9,14 @@ import {
   saveOutlineToPdf, setProgress, summarizeChapter,
 } from "../api";
 
-// Worker served from a stable, version-locked path (vite-plugin handles the
-// hashed asset; the ?url import keeps this immune to stale index.html caches
-// pointing at old hashes — the URL here always matches this JS bundle).
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url
-).toString();
+// Worker served from a STABLE unhashed path (/pdf.worker.mjs — copied to
+// web root in the Dockerfile). Its URL never changes between builds, so a
+// stale index.html can never point at a worker hash that no longer exists.
+// In the dev/preview stack (no Docker nginx), fall back to the vite-served
+// copy from node_modules.
+pdfjs.GlobalWorkerOptions.workerSrc = import.meta.env.PROD
+  ? "/pdf.worker.mjs"
+  : new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
 
 const CMAP_URL = "https://unpkg.com/pdfjs-dist@4.4.168/cmaps/";
 const STD_FONTS_URL = "https://unpkg.com/pdfjs-dist@4.4.168/standard_fonts/";
