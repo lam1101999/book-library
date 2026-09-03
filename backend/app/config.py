@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     llm_model: str = "z-ai/glm-5.3-flash"
     # max chars per chunk fed to the LLM for map-reduce summarization
     chunk_chars: int = 12000
+    # JWT session signing secret (app/auth.py also reads LIBRARY_JWT_SECRET
+    # directly from env; declaring the field here keeps pydantic-settings
+    # from rejecting the extra env var at import time)
+    jwt_secret: str = ""
 
     class Config:
         env_file = ".env"
